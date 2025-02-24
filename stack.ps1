@@ -1,5 +1,6 @@
 # Variables
-$resourceGroupName = "rg-bastion-demo-314156"
+$resourceGroupName = "rg-demo-snapshot-314156"
+$resourceGroupNameSnapshot = "rgdemo314156"
 $location = "eastus2"
 $vnetName = "vnet-demo-1"
 $vmSubnetName = "subnet-demo-1"
@@ -19,13 +20,13 @@ $rg = @{
 New-AzResourceGroup @rg
 
 # Snapshot OSDisk
-$snapshot = Get-AzSnapshot -ResourceGroupName $resourceGroupName -SnapshotName $snapshotOSName
-$diskOSConfig = New-AzDiskConfig -Location $location -SourceResourceId $snapshot.Id -CreateOption Copy
+$snapshotOS = Get-AzSnapshot -ResourceGroupName $resourceGroupNameSnapshot -SnapshotName $snapshotOSName
+$diskOSConfig = New-AzDiskConfig -Location $location -SourceResourceId $snapshotOS.Id -CreateOption Copy
 $diskOS = New-AzDisk -Disk $diskOSConfig -ResourceGroupName $resourceGroupName -DiskName $osDiskName
 
 # Snapshot DataDisk
-$snapshot = Get-AzSnapshot -ResourceGroupName $resourceGroupName -SnapshotName $snapshotDataName
-$diskDataConfig = New-AzDiskConfig -Location $location -SourceResourceId $snapshot.Id -CreateOption Copy
+$snapshotData = Get-AzSnapshot -ResourceGroupName $resourceGroupNameSnapshot -SnapshotName $snapshotDataName
+$diskDataConfig = New-AzDiskConfig -Location $location -SourceResourceId $snapshotData.Id -CreateOption Copy
 $diskData = New-AzDisk -Disk $diskDataConfig -ResourceGroupName $resourceGroupName -DiskName $dataDiskName
 
 # Virtual Network
@@ -46,36 +47,6 @@ $subnetConfig = Add-AzVirtualNetworkSubnetConfig @subnet
 
 $virtualNetwork | Set-AzVirtualNetwork
 
-# Azure Bastion
-$subnet = @{
-    Name = $bastionSubnetName
-    VirtualNetwork = $virtualNetwork
-    AddressPrefix = '10.0.1.0/26'
-}
-$subnetConfig = Add-AzVirtualNetworkSubnetConfig @subnet
-
-$virtualNetwork | Set-AzVirtualNetwork
-
-$ip = @{
-        ResourceGroupName = $resourceGroupName
-        Name = $bastionIPName
-        Location = $location
-        AllocationMethod = 'Static'
-        Sku = 'Standard'
-        Zone = 1
-}
-New-AzPublicIpAddress @ip
-
-$bastion = @{
-    Name = $bastionHostName
-    ResourceGroupName = $resourceGroupName
-    PublicIpAddressRgName = $resourceGroupName
-    PublicIpAddressName = $bastionIPName
-    VirtualNetworkRgName = $resourceGroupName
-    VirtualNetworkName = $vnetName 
-    Sku = 'Basic'
-}
-New-AzBastion @bastion
 
 # VM
 
@@ -112,11 +83,12 @@ $vmimage = @{
 $vmConfig = New-AzVMConfig @vmsz `
     | Set-AzVMOperatingSystem @vmos -Windows `
     | Set-AzVMSourceImage @vmimage `
-    | Add-AzVMNetworkInterface -Id $nicVM.Id `
-    | Set-AzVMOSDisk -ManagedDiskId $diskOS.Id -CreateOption Attach -Windows
-    | Add-AzVMDataDisk -Name $dataDiskName -ManagedDiskId $diskData.Id -Lun 0 -CreateOption Attach
+    | Add-AzVMNetworkInterface -Id $nicVM.Id 
+    #| Set-AzVMOSDisk -Name $diskOS.name -ManagedDiskId $diskOS.Id -StorageAccountType "Standard_LRS" -CreateOption Attach -Windows -DeleteOption Delete -Verbose `
+    #| Add-AzVMDataDisk -Name $diskData.name -ManagedDiskId $diskData.Id -Lun 0 -CreateOption Attach
 
-
+#$vmConfig = Set-AzVMOSDisk -VM $vmConfig -Name $diskOS.name -ManagedDiskId $diskOS.Id -StorageAccountType "Standard_LRS" -CreateOption Attach -Windows -DeleteOption Delete -Verbose 
+#$vmConfig = Add-AzVMDataDisk -VM $vmConfig -Name $diskData.name -ManagedDiskId $diskData.Id -Lun 0 -CreateOption Attach
 
 ## Create the VM. ##
 $vm = @{
