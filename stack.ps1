@@ -1,16 +1,28 @@
-# Variables
-$resourceGroupName = "rg-demo-snapshot-314156"
-$resourceGroupNameSnapshot = "rgdemo314156"
+# Global Variables
+$resourceGroupName = "rg-customer-009"
 $location = "eastus2"
-$vnetName = "vnet-demo-1"
-$vmSubnetName = "subnet-demo-1"
-$bastionSubnetName = "AzureBastionSubnet"
+$vnetName = "vnet-customer-eastus-009"
+$vmSubnetName = "snet-customer-009"
+$networkInterfaceName = "vm-customer-009-nic"
+$virtualMachineName = "vm-customer-009"
+#$virtualMachineFamily = "Standard_B2ls_v2"
+$virtualMachineFamily = "Standard_DS1_v2"
+$databaseServerName = "dertec-db-009-customer"
+$databaseName = "George"
+$privateEndpointName = "pep-customer-009"
+
+# Snapshot Variables
+$resourceGroupNameSnapshot = "rg-snapshots"
+$snapshotOSName = "mySnapshot-OSData"
+$osDiskName = "C"
+$snapshotDataName = "mySnapshot-Data"
+$dataDiskName = "F"
+
+# Bastion Variables
+$bastionSubnetName = "subnet-bastion-1"
 $bastionHostName = "bastion-demo-host"
 $bastionIPName = "bastion-demo-ip"
-$snapshotOSName = "mySnapshot-1"
-$osDiskName = "C"
-$snapshotDataName = "mySnapshot-1"
-$dataDiskName = "F"
+
 
 # Resource Group
 $rg = @{
@@ -19,81 +31,166 @@ $rg = @{
 }
 New-AzResourceGroup @rg
 
-# Snapshot OSDisk
-$snapshotOS = Get-AzSnapshot -ResourceGroupName $resourceGroupNameSnapshot -SnapshotName $snapshotOSName
-$diskOSConfig = New-AzDiskConfig -Location $location -SourceResourceId $snapshotOS.Id -CreateOption Copy
-$diskOS = New-AzDisk -Disk $diskOSConfig -ResourceGroupName $resourceGroupName -DiskName $osDiskName
-
-# Snapshot DataDisk
-$snapshotData = Get-AzSnapshot -ResourceGroupName $resourceGroupNameSnapshot -SnapshotName $snapshotDataName
-$diskDataConfig = New-AzDiskConfig -Location $location -SourceResourceId $snapshotData.Id -CreateOption Copy
-$diskData = New-AzDisk -Disk $diskDataConfig -ResourceGroupName $resourceGroupName -DiskName $dataDiskName
 
 # Virtual Network
-$vnet = @{
-    Name = $vnetName 
+$subnetConfig = New-AzVirtualNetworkSubnetConfig -Name $vmSubnetName -AddressPrefix 172.16.9.0/24
+
+$bastsubnetConfig = New-AzVirtualNetworkSubnetConfig -Name $bastionSubnetName -AddressPrefix 172.16.10.0/24
+
+$vnetParameters = @{
+    Name = $vnetName
     ResourceGroupName = $resourceGroupName
     Location = $location
-    AddressPrefix = '10.0.0.0/16'
+    AddressPrefix = "172.16.0.0/16"
+    Subnet = $subnetConfig, $bastsubnetConfig
 }
-$virtualNetwork = New-AzVirtualNetwork @vnet
+$vnet = New-AzVirtualNetwork @vnetParameters
 
-$subnet = @{
-    Name = $vmSubnetName
-    VirtualNetwork = $virtualNetwork
-    AddressPrefix = '10.0.0.0/24'
+# Bastion
+$bastionIP = @{
+    Name = $bastionIPName
+    ResourceGroupName = $resourceGroupName
+    Location = $location
+    Sku = 'Standard'
+    AllocationMethod = 'Static'
 }
-$subnetConfig = Add-AzVirtualNetworkSubnetConfig @subnet
+$publicip = New-AzPublicIpAddress @bastionIP
 
-$virtualNetwork | Set-AzVirtualNetwork
+$bastionParameters = @{
+    ResourceGroupName = $resourceGroupName
+    Name = $bastionHostName
+    PublicIpAddress = $publicip
+    VirtualNetwork = $vnet
+}
+New-AzBastion @bastionParameters
 
 
-# VM
+#Virtual Machine (Standard_B2ls_v2)
+$cred = Get-Credential
 
-# Set the administrator and password for the VM. ##
-$cred = Get-Credential -Message "Enter a username and password for the virtual machine."
+$vnet = Get-AzVirtualNetwork -Name $vnetName -ResourceGroupName $resourceGroupName
 
-## Place the virtual network into a variable. ##
-$vnet = Get-AzVirtualNetwork -Name $vnetName  -ResourceGroupName $resourceGroupName
-
-## Create a network interface for the VM. ##
-$nic = @{
-    Name = "nic-1"
+$netWorkParameters = @{
+    Name = $networkInterfaceName
     ResourceGroupName = $resourceGroupName
     Location = $location
     Subnet = $vnet.Subnets[0]
 }
-$nicVM = New-AzNetworkInterface @nic
+$nicVM = New-AzNetworkInterface @netWorkParameters
 
-## Create a virtual machine configuration. ##
-$vmsz = @{
-    VMName = "vm-1"
-    VMSize = 'Standard_B2ats_v2'  
+$vmParams = @{
+    VMName = $virtualMachineName
+    VMSize = $virtualMachineFamily
 }
-$vmos = @{
-    ComputerName = "vm-1"
+$vmOS = @{
+    ComputerName = "vmcustomerprd"
     Credential = $cred
 }
-$vmimage = @{
+$vmImage = @{
     PublisherName = 'MicrosoftWindowsServer'
     Offer = 'WindowsServer'
-    Skus = '2022-datacenter-azure-edition-smalldisk'
-    Version = 'latest'    
+    Skus = '2022-datacenter-azure-edition'
+    Version = 'latest'
 }
-$vmConfig = New-AzVMConfig @vmsz `
-    | Set-AzVMOperatingSystem @vmos -Windows `
-    | Set-AzVMSourceImage @vmimage `
-    | Add-AzVMNetworkInterface -Id $nicVM.Id 
-    #| Set-AzVMOSDisk -Name $diskOS.name -ManagedDiskId $diskOS.Id -StorageAccountType "Standard_LRS" -CreateOption Attach -Windows -DeleteOption Delete -Verbose `
-    #| Add-AzVMDataDisk -Name $diskData.name -ManagedDiskId $diskData.Id -Lun 0 -CreateOption Attach
+$vmConfig = New-AzVMConfig @vmParams | Set-AzVMOperatingSystem -Windows @vmOS | Set-AzVMSourceImage @vmImage | Add-AzVMNetworkInterface -Id $nicVM.Id
 
-#$vmConfig = Set-AzVMOSDisk -VM $vmConfig -Name $diskOS.name -ManagedDiskId $diskOS.Id -StorageAccountType "Standard_LRS" -CreateOption Attach -Windows -DeleteOption Delete -Verbose 
-#$vmConfig = Add-AzVMDataDisk -VM $vmConfig -Name $diskData.name -ManagedDiskId $diskData.Id -Lun 0 -CreateOption Attach
+## Create the virtual machine ##
+New-AzVM -ResourceGroupName $resourceGroupName -Location $location -VM $vmConfig
 
-## Create the VM. ##
-$vm = @{
+## Create OS Disk ##
+$snapshotOS = Get-AzSnapshot -ResourceGroupName $resourceGroupNameSnapshot -SnapshotName $snapshotOSName
+$diskOSConfig = New-AzDiskConfig -Location $location -SourceResourceId $snapshotOS.Id -CreateOption Copy
+$diskOS = New-AzDisk -Disk $diskOSConfig -ResourceGroupName $resourceGroupName -DiskName $osDiskName
+
+## Create Data Disk ##
+$snapshotData = Get-AzSnapshot -ResourceGroupName $resourceGroupNameSnapshot -SnapshotName $snapshotDataName
+$diskDataConfig = New-AzDiskConfig -Location $location -SourceResourceId $snapshotData.Id -CreateOption Copy
+$diskData = New-AzDisk -Disk $diskDataConfig -ResourceGroupName $resourceGroupName -DiskName $dataDiskName
+
+
+
+# Create Azure SQL Server
+$cred = Get-Credential
+
+$sqlConfig = @{
     ResourceGroupName = $resourceGroupName
+    ServerName = $databaseServerName
+    SqlAdministratorCredentials = $cred
     Location = $location
-    VM = $vmConfig
 }
-New-AzVM @vm
+New-AzSqlServer @sqlConfig
+
+$sqlDatabaseConfig = @{
+    ResourceGroupName = $resourceGroupName
+    ServerName = $databaseServerName
+    DatabaseName = $databaseName
+    RequestedServiceObjectiveName = 'S0'
+    SampleName = 'AdventureWorksLT'
+}
+New-AzSqlDatabase @sqlDatabaseConfig
+
+
+# Create Endpoint
+$server = Get-AzSqlServer -ResourceGroupName $resourceGroupName -ServerName $databaseServerName
+
+## Create private endpoint connection. ##
+$privateEndpointConnectionConfig = @{
+    Name = 'myConnection'
+    PrivateLinkServiceId = $server.ResourceID
+    GroupID = 'sqlserver'
+}
+$privateEndpointConnection = New-AzPrivateLinkServiceConnection @privateEndpointConnectionConfig
+
+## Place virtual network into variable. ##
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $resourceGroupName -Name $vnetName
+
+## Disable private endpoint network policy ##
+$vnet.Subnets[0].PrivateEndpointNetworkPolicies = "Disabled"
+$vnet | Set-AzVirtualNetwork
+
+## Create private endpoint
+$privateEndpointConfig = @{
+    ResourceGroupName = $resourceGroupName
+    Name = $privateEndpointName
+    Location = $location
+    Subnet = $vnet.Subnets[0]
+    PrivateLinkServiceConnection = $privateEndpointConnection
+}
+New-AzPrivateEndpoint @privateEndpointConfig
+
+
+# Private DNS Zone
+## Place virtual network into variable. ##
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $resourceGroupName -Name $vnetName
+
+## Create private dns zone. ##
+$dnsZoneConfig = @{
+    ResourceGroupName = $resourceGroupName
+    Name = 'privatelink.database.windows.net'
+}
+$zone = New-AzPrivateDnsZone @dnsZoneConfig
+
+## Create dns network link. ##
+$dnsNetworkLinkConfig = @{
+    ResourceGroupName = $resourceGroupName
+    ZoneName = 'privatelink.database.windows.net'
+    Name = 'myLink'
+    VirtualNetworkId = $vnet.Id
+}
+$link = New-AzPrivateDnsVirtualNetworkLink @dnsNetworkLinkConfig
+
+## Create DNS configuration ##
+$dnsConfig = @{
+    Name = 'privatelink.database.windows.net'
+    PrivateDnsZoneId = $zone.ResourceId
+}
+$config = New-AzPrivateDnsZoneConfig @dnsConfig
+
+## Create DNS zone group. ##
+$dnsZoneGroupConfig = @{
+    ResourceGroupName = $resourceGroupName
+    PrivateEndpointName = $privateEndpointName
+    Name = 'myZoneGroup'
+    PrivateDnsZoneConfig = $config
+}
+New-AzPrivateDnsZoneGroup @dnsZoneGroupConfig
