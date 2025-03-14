@@ -1,6 +1,6 @@
 # Global Variables
 $resourceGroupName = "rg-santander-009"
-$location = "eastus"
+$location = "eastus2"
 $vnetName = "vnet-santander-eastus-009"
 $vmSubnetName = "snet-santander-009"
 $networkInterfaceName = "vm-santander-009-nic"
@@ -18,6 +18,12 @@ $osDiskName = "C"
 $snapshotDataName = "snp-plantilla-george-data-f"
 $dataDiskName = "F"
 
+# Bastion Variables
+$bastionSubnetName = "subnet-bastion-1"
+$bastionHostName = "bastion-demo-host"
+$bastionIPName = "bastion-demo-ip"
+
+
 # Resource Group
 $rg = @{
     Name = $resourceGroupName
@@ -29,14 +35,34 @@ New-AzResourceGroup @rg
 # Virtual Network
 $subnetConfig = New-AzVirtualNetworkSubnetConfig -Name $vmSubnetName -AddressPrefix 172.16.9.0/24
 
+$bastsubnetConfig = New-AzVirtualNetworkSubnetConfig -Name $bastionSubnetName -AddressPrefix 172.16.10.0/24
+
 $vnetParameters = @{
     Name = $vnetName
     ResourceGroupName = $resourceGroupName
     Location = $location
     AddressPrefix = "172.16.0.0/16"
-    Subnet = $subnetConfig
+    Subnet = $subnetConfig, $bastsubnetConfig
 }
 $vnet = New-AzVirtualNetwork @vnetParameters
+
+# Bastion
+$bastionIP = @{
+    Name = $bastionIPName
+    ResourceGroupName = $resourceGroupName
+    Location = $location
+    Sku = 'Standard'
+    AllocationMethod = 'Static'
+}
+$publicip = New-AzPublicIpAddress @bastionIP
+
+$bastionParameters = @{
+    ResourceGroupName = $resourceGroupName
+    Name = $bastionHostName
+    PublicIpAddress = $publicip
+    VirtualNetwork = $vnet
+}
+New-AzBastion @bastionParameters
 
 
 #Virtual Machine (Standard_B2ls_v2)
