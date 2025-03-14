@@ -60,11 +60,13 @@ New-AzPrivateEndpoint @privateEndpointConfig
 $vnet = Get-AzVirtualNetwork -ResourceGroupName $resourceGroupName -Name $vnetName
 
 ## Create private dns zone. ##
-$dnsZoneConfig = @{
-    ResourceGroupName = $resourceGroupName
-    Name = 'privatelink.database.windows.net'
-}
-$zone = New-AzPrivateDnsZone @dnsZoneConfig
+#$dnsZoneConfig = @{
+#    ResourceGroupName = $resourceGroupName
+#    Name = 'privatelink.database.windows.net'
+#}
+#$zone = New-AzPrivateDnsZone @dnsZoneConfig
+
+$zone = Get-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name 'privatelink.database.windows.net'
 
 ## Create dns network link. ##
 $dnsNetworkLinkConfig = @{
