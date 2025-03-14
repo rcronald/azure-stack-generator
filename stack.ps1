@@ -1,21 +1,21 @@
 # Global Variables
-$resourceGroupName = "rg-customer-009"
+$resourceGroupName = "rg-santander-009"
 $location = "eastus2"
-$vnetName = "vnet-customer-eastus-009"
-$vmSubnetName = "snet-customer-009"
-$networkInterfaceName = "vm-customer-009-nic"
-$virtualMachineName = "vm-customer-009"
-#$virtualMachineFamily = "Standard_B2ls_v2"
-$virtualMachineFamily = "Standard_DS1_v2"
-$databaseServerName = "dertec-db-009-customer"
+$vnetName = "vnet-santander-eastus-009"
+$vmSubnetName = "snet-santander-009"
+$networkInterfaceName = "vm-santander-009-nic"
+$virtualMachineName = "vm-santander-009"
+$virtualMachineFamily = "Standard_B2ls_v2" ##2CPU y 4GB RAM
+#$virtualMachineFamily = "Standard_DS1_v2" ##1CPU y 3GB RAm
+$databaseServerName = "dertec-db-009-santander"
 $databaseName = "George"
-$privateEndpointName = "pep-customer-009"
+$privateEndpointName = "pep-santander-009"
 
 # Snapshot Variables
-$resourceGroupNameSnapshot = "rg-snapshots"
-$snapshotOSName = "mySnapshot-OSData"
+$resourceGroupNameSnapshot = "rg-plantilla-srvcliente-george"
+$snapshotOSName = "snp-plantilla-george-os"
 $osDiskName = "C"
-$snapshotDataName = "mySnapshot-Data"
+$snapshotDataName = "snp-plantilla-george-data-f"
 $dataDiskName = "F"
 
 # Bastion Variables
